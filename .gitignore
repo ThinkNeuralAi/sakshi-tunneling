@@ -1,0 +1,15 @@
+# Local store config has NVR credentials — never commit
+bin/config.yaml
+config.yaml
+
+# Runtime / compiled binaries
+bin/*
+!bin/.gitkeep
+bin/*.pid
+bin/*.log
+bin/*.exe
+*.exe
+frames/
+*.log
+.DS_Store
+Thumbs.db

@@ -1,0 +1,9 @@
+# TLS termination for the agent WebSocket.
+# Replace the hostname, then: caddy run --config Caddyfile
+#
+# Agent config.yaml:
+#   cloud_url: "wss://ingest.yourdomain.com/agent"
+
+ingest.yourdomain.com {
+	reverse_proxy ingest:8080
+}

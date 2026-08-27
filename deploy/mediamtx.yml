@@ -1,0 +1,29 @@
+# MediaMTX for the cloud ingest: agents do NOT publish here.
+# ffmpeg (started by cmd/ingest) publishes H.264; CV reads the same paths.
+logLevel: warn
+
+authMethod: internal
+authInternalUsers:
+  - user: any
+    pass:
+    ips: []
+    permissions:
+      - action: api
+      - action: publish
+      - action: read
+
+rtspAddress: ":8554"
+rtspEncryption: "no"
+writeQueueSize: 512
+
+api: yes
+apiAddress: ":9997"
+
+rtmp: no
+hls: no
+webrtc: no
+srt: no
+
+# Empty source = path is created when ffmpeg publishes.
+pathDefaults: {}
+paths: {}

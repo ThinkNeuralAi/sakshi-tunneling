@@ -1,0 +1,48 @@
+# Sakshi Edge Agent — store configuration
+#
+# The three lines a store installer actually fills in are nvr.host,
+# nvr.username, nvr.password, and the one-time enrollment_token.
+# Everything else has sensible defaults.
+
+# Assigned by the cloud on first enrollment. Leave blank on a fresh install.
+store_id: ""
+
+# One-time secret from your provisioning system. Binds this agent to a store.
+enrollment_token: "PASTE-ONE-TIME-TOKEN-HERE"
+
+# Your ingest endpoint. Use ws:// against the mock cloud for local testing.
+cloud_url: "ws://127.0.0.1:8080/agent"
+
+nvr:
+  vendor: "dahua"       # auto | hikvision | dahua | custom
+  host: "192.168.1.64"  # NVR / camera IP on the store LAN
+  http_port: 80
+  rtsp_port: 554
+  username: "admin"
+  password: "changeme"
+  # Pull these cameras. Each entry starts its own ffmpeg puller.
+  # channels: [1, 2, 26]
+  # channel_count: 8          # cameras 1..N if you don't want an explicit list
+  #
+  # Per-branch RTSP pattern. Leave empty to use the vendor default.
+  # Path-only (user/host/port filled from the fields above):
+  #   rtsp_url: "/cam/realmonitor?channel={channel}&subtype={subtype}"
+  # Full URL (Uniview / Hikvision / odd OEM):
+  #   rtsp_url: "rtsp://{user}:{pass}@{host}:{port}/Streaming/Channels/{channel_id}"
+  #   rtsp_url: "rtsp://{user}:{pass}@{host}:{port}/unicast/c{channel}/s{stream}/live"
+  # Placeholders: {user} {pass} {host} {port} {channel} {subtype} {stream} {channel_id} {userinfo}
+  #   {subtype}    0 = main, 1 = sub          (Dahua)
+  #   {stream}     1 = main, 2 = sub          (Hikvision / Uniview)
+  #   {channel_id} cam*100+stream, e.g. 101, 2602
+
+# Frames per second lifted per channel. 1 is plenty for most retail CV.
+sample_fps: 1
+
+# Pull the low-bitrate sub-stream (recommended) rather than the main stream.
+prefer_sub_stream: true
+
+# Also run an ONVIF LAN probe at startup, in addition to NVR enumeration.
+discovery_enabled: true
+
+# How often to report health to the cloud.
+heartbeat_interval: 30s

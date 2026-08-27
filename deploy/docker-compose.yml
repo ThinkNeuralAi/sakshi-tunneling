@@ -1,0 +1,35 @@
+# Cloud ingest + local RTSP for CV.
+#
+# Public (store agents):  wss://your.domain/agent  (put Caddy/nginx in front)
+# Private (CV on this box): rtsp://127.0.0.1:8554/{store_id}/{channel_id}
+#
+#   cd deploy && docker compose up -d --build
+
+services:
+  mediamtx:
+    image: bluenviron/mediamtx:latest
+    restart: unless-stopped
+    volumes:
+      - ./mediamtx.yml:/mediamtx.yml:ro
+    ports:
+      # Bind RTSP to localhost only — do not expose cameras to the internet.
+      - "127.0.0.1:8554:8554"
+      - "127.0.0.1:9997:9997"
+
+  ingest:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.ingest
+    restart: unless-stopped
+    environment:
+      INGEST_ADDR: ":8080"
+      MEDIAMTX_RTSP: "rtsp://mediamtx:8554"
+      # URL you paste into the CV app (same machine → 127.0.0.1).
+      PUBLIC_RTSP_BASE: "rtsp://127.0.0.1:8554"
+      RESTREAM_FPS: "15"
+      # Comma-separated. Empty = accept any token (dev only).
+      ENROLLMENT_TOKENS: ""
+    ports:
+      - "8080:8080"
+    depends_on:
+      - mediamtx
