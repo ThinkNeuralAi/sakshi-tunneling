@@ -50,7 +50,8 @@ func main() {
 	}
 	defer logFile.Close()
 
-	cmd := exec.Command(agent, "run", "--config", cfg)
+	cmd := exec.Command(agent, "--config", cfg)
+	cmd.Dir = dir
 	cmd.Stdout = logFile
 	cmd.Stderr = logFile
 	cmd.Stdin = nil
