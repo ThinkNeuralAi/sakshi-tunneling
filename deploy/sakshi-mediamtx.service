@@ -1,0 +1,18 @@
+[Unit]
+Description=Sakshi MediaMTX (local RTSP for CV)
+After=network.target
+
+[Service]
+Type=simple
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/home/ubuntu/mediamtx
+ExecStart=/home/ubuntu/mediamtx/mediamtx
+Restart=always
+RestartSec=3
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=sakshi-mediamtx
+
+[Install]
+WantedBy=multi-user.target

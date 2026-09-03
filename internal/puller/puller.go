@@ -17,6 +17,7 @@ import (
 	"fmt"
 	"io"
 	"os/exec"
+	"strings"
 	"time"
 )
 
@@ -54,13 +55,11 @@ func Run(ctx context.Context, opt Options, onFrame func(Frame)) error {
 	// last picture and we push identical JPEGs (seq climbs, image does not).
 	// Decode every frame, sample in process by wall clock, skip duplicates.
 	args := []string{
+		"-hide_banner",
 		"-loglevel", "error",
 		"-rtsp_transport", transport,
-		"-fflags", "nobuffer+discardcorrupt",
-		"-flags", "low_delay",
 		"-i", opt.RTSPURL,
 		"-an",
-		"-vsync", "0",
 		"-f", "image2pipe",
 		"-vcodec", "mjpeg",
 		"-q:v", "5",
@@ -68,32 +67,31 @@ func Run(ctx context.Context, opt Options, onFrame func(Frame)) error {
 	}
 
 	cmd := exec.CommandContext(ctx, "ffmpeg", args...)
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
 		return fmt.Errorf("ffmpeg stdout: %w", err)
 	}
 	if err := cmd.Start(); err != nil {
-		return fmt.Errorf("start ffmpeg: %w", err)
+		return fmt.Errorf("start ffmpeg: %w (is ffmpeg on PATH?)", err)
 	}
 
 	interval := time.Duration(float64(time.Second) / opt.FPS)
 	var seq int64
 	var lastAt time.Time
-	var lastJPEG []byte
 	err = splitJPEG(bufio.NewReaderSize(stdout, 1<<20), func(jpeg []byte) {
 		now := time.Now()
 		if !lastAt.IsZero() && now.Sub(lastAt) < interval {
 			return
 		}
-		if bytes.Equal(jpeg, lastJPEG) {
-			return
-		}
 		lastAt = now
-		lastJPEG = append(lastJPEG[:0], jpeg...)
 		seq++
+		img := make([]byte, len(jpeg))
+		copy(img, jpeg)
 		onFrame(Frame{
 			ChannelID:  opt.ChannelID,
-			JPEG:       jpeg,
+			JPEG:       img,
 			CapturedAt: now.UTC(),
 			Seq:        seq,
 		})
@@ -103,8 +101,15 @@ func Run(ctx context.Context, opt Options, onFrame func(Frame)) error {
 	if ctx.Err() != nil {
 		return ctx.Err() // clean shutdown
 	}
+	fferr := strings.TrimSpace(stderr.String())
 	if err != nil {
+		if fferr != "" {
+			return fmt.Errorf("read frames: %w; ffmpeg: %s", err, fferr)
+		}
 		return fmt.Errorf("read frames: %w", err)
+	}
+	if waitErr != nil && fferr != "" {
+		return fmt.Errorf("%v; ffmpeg: %s", waitErr, fferr)
 	}
 	return waitErr
 }

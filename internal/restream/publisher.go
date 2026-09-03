@@ -9,13 +9,11 @@
 package restream
 
 import (
-	"bytes"
 	"fmt"
 	"io"
 	"log"
 	"os/exec"
 	"regexp"
-	"strings"
 	"sync"
 	"time"
 )
@@ -24,8 +22,9 @@ var safe = regexp.MustCompile(`[^a-zA-Z0-9_-]+`)
 
 // Hub is the process-wide registry of per-camera publishers.
 type Hub struct {
-	mtxBase string
-	fps     int
+	mtxBase  string
+	fps      int
+	restream bool
 
 	mu    sync.Mutex
 	chans map[string]*Publisher
@@ -40,15 +39,19 @@ type Info struct {
 	UpdatedAt time.Time `json:"updated_at"`
 }
 
-// NewHub publishes to mtxBase (e.g. rtsp://127.0.0.1:8554).
-func NewHub(mtxBase string, fps int) *Hub {
+// NewHub stores inbound JPEGs. If restream is true, each camera is also
+// republished to MediaMTX via ffmpeg. Turn restream off when MediaMTX is
+// not running — the ffmpeg crash-loop can stall the WebSocket and freeze
+// /latest/ on the first frame.
+func NewHub(mtxBase string, fps int, restream bool) *Hub {
 	if fps <= 0 {
 		fps = 15
 	}
 	return &Hub{
-		mtxBase: mtxBase,
-		fps:     fps,
-		chans:   map[string]*Publisher{},
+		mtxBase:  mtxBase,
+		fps:      fps,
+		restream: restream,
+		chans:    map[string]*Publisher{},
 	}
 }
 
@@ -94,7 +97,9 @@ func (h *Hub) get(storeID, channelID string) *Publisher {
 	}
 	p := newPublisher(storeID, channelID, h.mtxBase, h.fps)
 	h.chans[key] = p
-	go p.supervise()
+	if h.restream {
+		go p.supervise()
+	}
 	return p
 }
 
@@ -195,8 +200,7 @@ func (p *Publisher) runOnce() error {
 	if err != nil {
 		return err
 	}
-	var stderr bytes.Buffer
-	cmd.Stderr = &stderr
+	cmd.Stderr = io.Discard
 	if err := cmd.Start(); err != nil {
 		return fmt.Errorf("start ffmpeg: %w (is ffmpeg installed?)", err)
 	}
@@ -208,22 +212,14 @@ func (p *Publisher) runOnce() error {
 	tick := time.NewTicker(time.Second / time.Duration(p.fps))
 	defer tick.Stop()
 
-	ffmpegErr := func(err error) error {
-		msg := strings.TrimSpace(stderr.String())
-		if msg == "" {
-			return err
-		}
-		return fmt.Errorf("%v; ffmpeg: %s", err, msg)
-	}
-
 	for {
 		select {
 		case err := <-done:
 			_ = stdin.Close()
 			if err == nil {
-				return ffmpegErr(io.EOF)
+				return io.EOF
 			}
-			return ffmpegErr(err)
+			return err
 		case <-tick.C:
 			frame := p.snapshot()
 			if frame == nil {
@@ -232,7 +228,7 @@ func (p *Publisher) runOnce() error {
 			if _, err := stdin.Write(frame); err != nil {
 				_ = cmd.Process.Kill()
 				<-done
-				return ffmpegErr(err)
+				return err
 			}
 		}
 	}

@@ -46,8 +46,13 @@ func main() {
 		fmt.Sscanf(v, "%d", &fps)
 	}
 	tokens := splitTokens(env("ENROLLMENT_TOKENS", ""))
+	enableRestream := true
+	switch strings.ToLower(strings.TrimSpace(env("ENABLE_RESTREAM", "1"))) {
+	case "0", "false", "no", "off":
+		enableRestream = false
+	}
 
-	hub := restream.NewHub(mtx, fps)
+	hub := restream.NewHub(mtx, fps, enableRestream)
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/health", func(w http.ResponseWriter, _ *http.Request) {
@@ -94,8 +99,11 @@ func main() {
 
 	log.Printf("ingest listening on %s", addr)
 	log.Printf("  WS   %s/agent", addr)
-	log.Printf("  RTSP publish → %s/{store}/{channel}", mtx)
-	log.Printf("  CV should open → %s/{store}/{channel}", public)
+	if enableRestream {
+		log.Printf("  RTSP restream ON → %s/{store}/{channel}", mtx)
+	} else {
+		log.Printf("  RTSP restream OFF (ENABLE_RESTREAM=0); use /latest/{store}/{ch}.jpg")
+	}
 	if len(tokens) == 0 {
 		log.Printf("WARNING: ENROLLMENT_TOKENS is empty; any agent token is accepted")
 	}
@@ -156,7 +164,9 @@ func handleAgent(w http.ResponseWriter, r *http.Request, hub *restream.Hub, toke
 			if storeID != "" {
 				store = storeID
 			}
-			hub.Push(store, ch, seq, jpeg)
+			jpegCopy := make([]byte, len(jpeg))
+			copy(jpegCopy, jpeg)
+			hub.Push(store, ch, seq, jpegCopy)
 			continue
 		}
 

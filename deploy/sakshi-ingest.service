@@ -1,0 +1,32 @@
+[Unit]
+Description=Sakshi edge ingest (WebSocket /agent)
+After=network-online.target
+Wants=network-online.target
+# If MediaMTX is installed as a service, start ingest after it.
+After=sakshi-mediamtx.service
+
+[Service]
+Type=simple
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/home/ubuntu/sakshi-edge-agent
+ExecStart=/home/ubuntu/sakshi-edge-agent/ingest
+Restart=always
+RestartSec=3
+# Same port the Windows agent uses: ws://IP:8081/agent
+Environment=INGEST_ADDR=:8081
+Environment=MEDIAMTX_RTSP=rtsp://127.0.0.1:8554
+Environment=PUBLIC_RTSP_BASE=rtsp://127.0.0.1:8554
+Environment=RESTREAM_FPS=15
+# Keep the WebSocket stable. ffmpeg→MediaMTX crash-loop freezes /latest/ on frame 1.
+# Set to 1 only after MediaMTX is running as a service.
+Environment=ENABLE_RESTREAM=0
+Environment=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+# ffmpeg (restream) must be installed: sudo apt-get install -y ffmpeg
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=sakshi-ingest
+
+[Install]
+WantedBy=multi-user.target

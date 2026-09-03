@@ -13,6 +13,7 @@ package agent
 import (
 	"context"
 	"log"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -158,6 +159,7 @@ func (a *Agent) superviseChannel(ctx context.Context, channelID, rtsp string) {
 		fps := a.fps
 		a.mu.Unlock()
 
+		log.Printf("channel %s pulling %s", channelID, redactRTSP(rtsp))
 		err := puller.Run(ctx, puller.Options{
 			ChannelID: channelID,
 			RTSPURL:   rtsp,
@@ -230,4 +232,13 @@ func (a *Agent) onCommand(cmd cloud.Command) {
 	default:
 		log.Printf("unhandled command %q", cmd.Action)
 	}
+}
+
+func redactRTSP(u string) string {
+	at := strings.Index(u, "@")
+	scheme := strings.Index(u, "://")
+	if at < 0 || scheme < 0 || at < scheme {
+		return u
+	}
+	return u[:scheme+3] + "***@" + u[at+1:]
 }
